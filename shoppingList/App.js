@@ -23,6 +23,7 @@ export default function App() {
 
   const handleClear = () => {
     setShoppingList([])
+    setListItem("")
   }
   return (
     <View style={styles.container}>
