@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -6,42 +6,91 @@ import {
   TextInput,
   Button,
   FlatList,
+  Pressable,
 } from "react-native";
+import * as SQLite from "expo-sqlite";
 
 export default function App() {
   const [shoppingList, setShoppingList] = useState([]);
-  const [listItem, setListItem] = useState("");
+  const [product, setProduct] = useState("");
+  const [amount, setAmount] = useState("");
+  const db = SQLite.openDatabase("shoppinglistdb.db");
 
-  const handleAdd = () => {
-    setShoppingList([
-      ...shoppingList,
-      { value: listItem, key: shoppingList.length + 1 },
-    ]);
-    setListItem("");
+  useEffect(() => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          "create table if not exists shoppinglist (id integer primary key not null, product text, amount text);"
+        );
+      },
+      null,
+      updateList
+    );
+  }, []);
+
+  const updateList = () => {
+    db.transaction((tx) => {
+      tx.executeSql("select * from shoppinglist;", [], (_, { rows }) => {
+        console.log(rows);
+        setShoppingList(rows._array);
+      });
+    });
   };
 
-  const handleClear = () => {
-    setShoppingList([]);
-    setListItem("");
+  const saveProduct = () => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          "insert into shoppinglist (product, amount) values (?, ?);",
+          [product, amount]
+        );
+      },
+      null,
+      updateList
+    );
+    setProduct("");
+    setAmount("");
   };
+
+  const deleteProduct = (id) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql("delete from shoppinglist where id = ?", [id]);
+      },
+      null,
+      updateList
+    );
+  };
+
   return (
     <View style={styles.container}>
       <TextInput
         style={styles.input}
-        onChangeText={(value) => setListItem(value)}
-        value={listItem}
+        onChangeText={(value) => setProduct(value)}
+        value={product}
+      />
+      <TextInput
+        style={styles.input}
+        onChangeText={(value) => setAmount(value)}
+        value={amount}
       />
       <View style={{ flexDirection: "row" }}>
-        <Button onPress={handleAdd} title="ADD" />
-        <Button onPress={handleClear} title="CLEAR" />
+        <Button onPress={saveProduct} title="SAVE" />
       </View>
       <View style={styles.container}>
         <Text style={styles.titleText}>Shopping List</Text>
         <FlatList
           data={shoppingList}
-          keyExtractor={(item, index) => item.key.toString()}
+          keyExtractor={(item, index) => item.id.toString()}
           renderItem={({ item }) => (
-            <Text style={styles.baseText}>{item.value}</Text>
+            <View style={{ flexDirection: "row" }}>
+              <Text style={styles.baseText}>
+                {item.product}, {item.amount}
+              </Text>
+              <Pressable onPress={() => deleteProduct(item.id)}>
+                <Text style={styles.bought}>Bought</Text>
+              </Pressable>
+            </View>
           )}
         />
       </View>
@@ -61,7 +110,7 @@ const styles = StyleSheet.create({
     width: 200,
     borderColor: "gray",
     borderWidth: 1,
-    margin: 10,
+    marginBottom: 5,
   },
   titleText: {
     fontSize: 20,
@@ -71,5 +120,9 @@ const styles = StyleSheet.create({
   baseText: {
     flexDirection: "row",
     fontSize: 15,
+  },
+  bought: {
+    color: "blue",
+    marginLeft: 10,
   },
 });
